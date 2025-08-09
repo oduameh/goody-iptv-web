@@ -32,6 +32,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AssistChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -67,6 +69,8 @@ import com.goody.iptv.ui.nowNextFor
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.goody.iptv.ui.PlayerControls
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,6 +109,8 @@ fun App() {
         var favorites by remember { mutableStateOf(setOf<String>()) }
         var programmes by remember { mutableStateOf<Map<String, List<Programme>>>(emptyMap()) }
         var showEpg by remember { mutableStateOf(false) }
+        var favoritesOnly by remember { mutableStateOf(false) }
+        var sortByGroup by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             playlistUrl = prefs.playlistUrl.first()
@@ -144,11 +150,19 @@ fun App() {
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Search") }
                     )
-                    Spacer(Modifier.height(8.dp))
-                    val filtered = channels.filter { c ->
-                        val q = query.trim().lowercase()
-                        q.isBlank() || c.name.lowercase().contains(q) || (c.group ?: "").lowercase().contains(q)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AssistChip(onClick = { favoritesOnly = !favoritesOnly }, label = { Text(if (favoritesOnly) "Favorites ✓" else "Favorites") })
+                        Spacer(Modifier.width(8.dp))
+                        AssistChip(onClick = { sortByGroup = !sortByGroup }, label = { Text(if (sortByGroup) "Sort: Group" else "Sort: Name") })
                     }
+                    Spacer(Modifier.height(8.dp))
+                    var filtered = channels.filter { c ->
+                        val q = query.trim().lowercase()
+                        val matches = q.isBlank() || c.name.lowercase().contains(q) || (c.group ?: "").lowercase().contains(q)
+                        val favOk = !favoritesOnly || favorites.contains(c.url)
+                        matches && favOk
+                    }
+                    filtered = if (sortByGroup) filtered.sortedWith(compareBy({ it.group ?: "" }, { it.name })) else filtered.sortedBy { it.name }
                     if (showEpg && programmes.isNotEmpty()) {
                         EpgGrid(channels = filtered, programmes = programmes)
                     } else {
@@ -248,6 +262,17 @@ fun PlayerPane(channel: Channel?) {
             .setMimeType(MimeTypes.APPLICATION_M3U8)
             .build()
         p.setMediaItem(item)
+        p.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                // no-op
+            }
+            override fun onPlayerError(error: PlaybackException) {
+                // Simple retry with fresh prepare
+                p.stop()
+                p.prepare()
+                p.playWhenReady = true
+            }
+        })
         p.prepare()
         p.playWhenReady = true
         player = p
