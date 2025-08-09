@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services") apply false
+    id("com.google.firebase.crashlytics") apply false
 }
 
 android {
@@ -69,6 +71,12 @@ android {
     }
 }
 
+// Conditionally apply Google Services and Crashlytics only if a config file is present
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
     implementation(composeBom)
@@ -103,4 +111,9 @@ dependencies {
 
     // XML parsing for XMLTV (basic)
     implementation("androidx.annotation:annotation:1.8.0")
+
+    // Firebase (optional; active only if google-services.json present)
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx")
 } 
