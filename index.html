@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goody IPTV Lite</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#0b0f17; --panel:#121a26; --text:#e9f0ff; --muted:#a7b1c7; --acc:#6aa7ff; }
+  html,body { height:100%; margin:0; background:linear-gradient(180deg,#0b0f17,#0a1322); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:1100px; margin:0 auto; padding:14px; }
+  header { display:flex; gap:10px; align-items:center; padding:8px 0 12px; }
+  h1 { font-size:20px; margin:0; letter-spacing:.2px; }
+  .note { color:var(--muted); font-size:12px; }
+  .grid { display:grid; grid-template-columns: 1fr; gap:12px; }
+  @media(min-width:900px){ .grid{ grid-template-columns: 360px 1fr; } }
+  .panel { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:12px; }
+  input[type="search"]{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); color:var(--text); outline:none; }
+  ul{ list-style:none; padding:0; margin:8px 0 0; max-height:60vh; overflow:auto; }
+  li{ display:flex; gap:10px; align-items:center; padding:8px; border-radius:10px; cursor:pointer; border:1px solid transparent; }
+  li:hover{ background:rgba(255,255,255,.06); }
+  li.active{ background:rgba(106,167,255,.1); border-color:rgba(106,167,255,.4); }
+  .logo{ width:42px; height:42px; object-fit:contain; background:rgba(255,255,255,.06); border-radius:8px; }
+  .name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sub{ color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  video { width:100%; aspect-ratio:16/9; background:#000; border-radius:16px; }
+  .topbar{ display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .btn{ background:var(--acc); color:#001029; border:none; padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
+  .btn:disabled{ opacity:.6; cursor:not-allowed; }
+  .pill{ font-size:12px; padding:4px 8px; border:1px solid rgba(255,255,255,.2); border-radius:999px; color:var(--muted); }
+  footer{ text-align:center; color:var(--muted); font-size:12px; padding:16px 0; }
+</style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0f17">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Goody IPTV Lite</h1>
+      <span class="pill">no install • test in 60s</span>
+      <div style="margin-left:auto" class="note">Use only legal streams.</div>
+    </header>
+
+    <div class="grid">
+      <aside class="panel">
+        <div class="note" style="margin-bottom:6px;">Playlist</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <input id="playlistUrl" type="search" placeholder="Playlist M3U URL" value="https://iptv-org.github.io/iptv/countries/ie.m3u">
+          <button class="btn" id="loadBtn">Load</button>
+        </div>
+        <input id="q" type="search" placeholder="Search channels…">
+        <ul id="list"></ul>
+      </aside>
+
+      <section class="panel">
+        <div class="topbar">
+          <div id="title" class="name">Select a channel</div>
+          <button class="btn" id="goLiveBtn" disabled>Go live</button>
+        </div>
+        <video id="vid" controls playsinline webkit-playsinline preload="auto"></video>
+        <div class="note" style="margin-top:8px;">Tip: tap a channel on the left. If playback stalls, try another entry (some may be offline).</div>
+      </section>
+    </div>
+
+    <footer>Goody IPTV • single-file test app • HLS via hls.js</footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <script>
+    const qs = s => document.querySelector(s);
+    const listEl = qs('#list');
+    const qEl = qs('#q');
+    const titleEl = qs('#title');
+    const video = qs('#vid');
+    const loadBtn = qs('#loadBtn');
+    const urlEl = qs('#playlistUrl');
+    const goLiveBtn = qs('#goLiveBtn');
+
+    let CHANNELS = [];
+    let CURRENT = -1;
+    let hls;
+
+    function parseM3U(text){
+      const lines = text.split(/\r?\n/);
+      const out = [];
+      let meta = null;
+      for (let line of lines){
+        line = line.trim();
+        if (!line) continue;
+        if (line.startsWith('#EXTM3U')) continue;
+        if (line.startsWith('#EXTINF:')){
+          meta = {name:'', logo:'', group:'', tvgId:''};
+          const comma = line.indexOf(',');
+          const attrs = line.substring(8, comma>-1?comma:line.length);
+          meta.name = comma>-1 ? line.substring(comma+1).trim() : '';
+          const re = /([a-zA-Z0-9-]+)=\"(.*?)\"/g;
+          let m; while((m = re.exec(attrs))){
+            const k = m[1], v = m[2];
+            if (k==='tvg-logo') meta.logo = v;
+            if (k==='group-title') meta.group = v;
+            if (k==='tvg-id') meta.tvgId = v;
+          }
+        } else if (meta && !line.startsWith('#')) {
+          out.push({name: meta.name || line, url: line, logo: meta.logo, group: meta.group, tvgId: meta.tvgId});
+          meta = null;
+        }
+      }
+      return out;
+    }
+
+    function render(list){
+      listEl.innerHTML = '';
+      list.forEach((c, i) => {
+        const li = document.createElement('li');
+        li.className = (i===CURRENT)?'active':'';
+        li.innerHTML = `
+          <img class="logo" src="${c.logo||''}" onerror="this.style.visibility='hidden'">
+          <div style="min-width:0">
+            <div class="name">${c.name||'Untitled'}</div>
+            <div class="sub">${c.group||new URL(c.url).hostname}</div>
+          </div>`;
+        li.onclick = () => playIndex(i);
+        listEl.appendChild(li);
+      });
+    }
+
+    function filter(){
+      const q = qEl.value.trim().toLowerCase();
+      const list = q ? CHANNELS.filter(c =>
+        (c.name||'').toLowerCase().includes(q) ||
+        (c.group||'').toLowerCase().includes(q)) : CHANNELS;
+      render(list);
+    }
+
+    async function loadPlaylist(){
+      const url = urlEl.value.trim();
+      loadBtn.disabled = true; loadBtn.textContent = 'Loading…';
+      try{
+        const res = await fetch(url, {cache:'no-store'});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const txt = await res.text();
+        CHANNELS = parseM3U(txt);
+        CURRENT = -1;
+        qEl.value = '';
+        filter();
+        if (CHANNELS.length) playIndex(0);
+      }catch(e){
+        alert('Failed to load playlist: '+e.message);
+      }finally{
+        loadBtn.disabled = false; loadBtn.textContent = 'Load';
+      }
+    }
+
+    function setupPlayer(src){
+      if (hls) { hls.destroy(); hls = null; }
+      if (Hls.isSupported()) {
+        hls = new Hls({lowLatencyMode:true, enableWorker:true, backBufferLength: 90});
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          console.warn('HLS error', data);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = src;
+      } else {
+        video.src = src;
+      }
+    }
+
+    function playIndex(i){
+      const c = CHANNELS[i];
+      CURRENT = i;
+      titleEl.textContent = c.name;
+      setupPlayer(c.url);
+      render(CHANNELS);
+      video.play().catch(()=>{});
+    }
+
+    // Go Live (seek to end) if possible
+    goLiveBtn.onclick = () => { try{ video.currentTime = Math.max(0, video.seekable?.end(0) - 1); }catch{} };
+    setInterval(() => {
+      try{
+        const liveEdge = video.seekable && video.seekable.length ? video.seekable.end(0) : NaN;
+        goLiveBtn.disabled = !Number.isFinite(liveEdge) || Math.abs(liveEdge - video.currentTime) < 2;
+      }catch{}
+    }, 1000);
+
+    qEl.addEventListener('input', filter);
+    loadBtn.addEventListener('click', loadPlaylist);
+
+    // Auto-load default Ireland playlist
+    loadPlaylist();
+  
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    });
+  }
+
+</script>
+</body>
+</html>

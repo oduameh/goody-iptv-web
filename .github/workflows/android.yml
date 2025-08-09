@@ -1,0 +1,47 @@
+name: Android CI
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle Build (assemble and bundle)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.7
+          build-root-directory: goody-iptv-app
+          arguments: |
+            :app:assemblePhoneDebug
+            :app:assembleTvDebug
+            :app:bundlePhoneRelease
+            :app:bundleTvRelease
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: goody-iptv-apks
+          path: |
+            goody-iptv-app/app/build/outputs/apk/phone/debug/*.apk
+            goody-iptv-app/app/build/outputs/apk/tv/debug/*.apk
+
+      - name: Upload AABs
+        uses: actions/upload-artifact@v4
+        with:
+          name: goody-iptv-aabs
+          path: |
+            goody-iptv-app/app/build/outputs/bundle/phoneRelease/*.aab
+            goody-iptv-app/app/build/outputs/bundle/tvRelease/*.aab 
