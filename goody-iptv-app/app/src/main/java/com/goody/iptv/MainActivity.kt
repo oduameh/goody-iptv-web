@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -59,6 +60,7 @@ import coil.compose.AsyncImage
 import com.goody.iptv.data.Prefs
 import com.goody.iptv.data.PlaylistRepository
 import com.goody.iptv.model.Channel
+import com.goody.iptv.ui.EpgGrid
 import com.goody.iptv.ui.Programme
 import com.goody.iptv.ui.fetchXmlTvNowNext
 import com.goody.iptv.ui.nowNextFor
@@ -101,6 +103,7 @@ fun App() {
         var playing by remember { mutableStateOf<Channel?>(null) }
         var favorites by remember { mutableStateOf(setOf<String>()) }
         var programmes by remember { mutableStateOf<Map<String, List<Programme>>>(emptyMap()) }
+        var showEpg by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             playlistUrl = prefs.playlistUrl.first()
@@ -120,12 +123,14 @@ fun App() {
         Scaffold(
             topBar = {
                 TopAppBar(title = { Text("Goody IPTV") }, actions = {
-                    IconButton(onClick = {
-                        TrackDialogController.open()
-                    }) { Icon(painterResource(android.R.drawable.ic_menu_sort_by_size), contentDescription = "Tracks") }
-                    IconButton(onClick = {
-                        SettingsDialogState.open = true
-                    }) { Icon(painterResource(android.R.drawable.ic_menu_preferences), contentDescription = "Settings") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!xmltvUrl.isNullOrBlank()) {
+                            Text("EPG", modifier = Modifier.padding(end = 6.dp))
+                            Switch(checked = showEpg, onCheckedChange = { showEpg = it })
+                        }
+                    }
+                    IconButton(onClick = { TrackDialogController.open() }) { Icon(painterResource(android.R.drawable.ic_menu_sort_by_size), contentDescription = "Tracks") }
+                    IconButton(onClick = { SettingsDialogState.open = true }) { Icon(painterResource(android.R.drawable.ic_menu_preferences), contentDescription = "Settings") }
                 })
             },
             snackbarHost = { SnackbarHost(hostState = snackbar) }
@@ -143,24 +148,28 @@ fun App() {
                         val q = query.trim().lowercase()
                         q.isBlank() || c.name.lowercase().contains(q) || (c.group ?: "").lowercase().contains(q)
                     }
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        itemsIndexed(filtered, key = { _, c -> c.url }) { _, c ->
-                            ChannelRow(
-                                channel = c,
-                                isFavorite = favorites.contains(c.url),
-                                now = nowNextFor(c, programmes).first,
-                                next = nowNextFor(c, programmes).second,
-                                onClick = {
-                                    playing = c
-                                    scope.launch { prefs.setLastUrl(c.url) }
-                                },
-                                onToggleFavorite = {
-                                    scope.launch {
-                                        if (favorites.contains(c.url)) prefs.removeFavorite(c.url) else prefs.addFavorite(c.url)
-                                        favorites = prefs.favorites.first()
+                    if (showEpg && programmes.isNotEmpty()) {
+                        EpgGrid(channels = filtered, programmes = programmes)
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            itemsIndexed(filtered, key = { _, c -> c.url }) { _, c ->
+                                ChannelRow(
+                                    channel = c,
+                                    isFavorite = favorites.contains(c.url),
+                                    now = nowNextFor(c, programmes).first,
+                                    next = nowNextFor(c, programmes).second,
+                                    onClick = {
+                                        playing = c
+                                        scope.launch { prefs.setLastUrl(c.url) }
+                                    },
+                                    onToggleFavorite = {
+                                        scope.launch {
+                                            if (favorites.contains(c.url)) prefs.removeFavorite(c.url) else prefs.addFavorite(c.url)
+                                            favorites = prefs.favorites.first()
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
