@@ -11,15 +11,16 @@ android {
         applicationId = "com.goody.iptv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 1)
+        versionName = System.getenv("VERSION_NAME") ?: "1.0"
 
         vectorDrawables.useSupportLibrary = true
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
