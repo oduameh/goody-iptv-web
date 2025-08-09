@@ -1,10 +1,14 @@
 name: Android CI
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
   workflow_dispatch:
+
+env:
+  VERSION_NAME: 1.0.${{ github.run_number }}
+  BUILD_NUMBER: ${{ github.run_number }}
 
 jobs:
   build:

@@ -66,6 +66,7 @@ import com.goody.iptv.ui.fetchXmlTvNowNext
 import com.goody.iptv.ui.nowNextFor
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.goody.iptv.ui.PlayerControls
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -197,6 +198,7 @@ fun App() {
             )
         }
         TrackDialogController.Render()
+        PlayerControls.Render()
     }
 }
 
@@ -264,6 +266,7 @@ fun PlayerPane(channel: Channel?) {
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = { TrackDialogController.showTracks(player) }) { Text("Tracks") }
+                TextButton(onClick = { PlayerControls.show(player) }) { Text("Subtitles") }
                 TextButton(onClick = { player?.seekTo(Long.MAX_VALUE) }) { Text("Go Live") }
             }
         } else {
