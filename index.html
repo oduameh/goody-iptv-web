@@ -589,9 +589,62 @@
       }
     };
     
+    // Check for completed payments periodically
+    function checkForCompletedPayment() {
+      // Only check if trial expired and not already unlocked
+      if (!isTrialExpired() || isUnlocked()) return;
+
+      // Get device ID
+      const deviceId = localStorage.getItem('goodytv_device_id');
+      if (!deviceId) return;
+
+      console.log('🔍 Checking for completed payment...');
+
+      // Check payment status on both local and deployed endpoint
+      const checkUrls = [
+        'https://goody-iptv-o36jamyez-oduamehs-projects.vercel.app/api/check-payment',
+        '/api/check-payment'
+      ];
+
+      checkUrls.forEach(baseUrl => {
+        fetch(`${baseUrl}?deviceId=${deviceId}`)
+          .then(response => response.json())
+          .then(data => {
+            if (data.paid && data.licenseKey) {
+              console.log('🎉 Payment completed! Auto-unlocking...');
+              unlock(data.licenseKey);
+              showSuccessMessage(`✅ License activated: ${data.licenseKey}`);
+            }
+          })
+          .catch(error => console.log('Payment check failed:', error));
+      });
+    }
+
+    function showSuccessMessage(message) {
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        background: #28a745; color: white; padding: 15px 20px;
+        border-radius: 8px; font-size: 14px; max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      `;
+      successDiv.textContent = message;
+      document.body.appendChild(successDiv);
+
+      setTimeout(() => {
+        successDiv.remove();
+      }, 5000);
+    }
+
     // Initialize trial and auto-load playlist
     initTrial();
     loadPlaylist();
+
+    // Check for completed payments every 10 seconds
+    setInterval(checkForCompletedPayment, 10000);
+    
+    // Check immediately after 2 seconds
+    setTimeout(checkForCompletedPayment, 2000);
   
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
