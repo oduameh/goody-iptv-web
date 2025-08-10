@@ -154,16 +154,16 @@ export default async function handler(req, res) {
       // Generate license key
       const licenseKey = generateLicenseKey(deviceId);
       
-                // Store license in database
-          await storeLicense(deviceId, licenseKey, email, session.id);
+      // Store license in database
+      await storeLicense(deviceId, licenseKey, email, session.id);
 
-          // Store completed payment for instant checking
-          storeCompletedPayment(deviceId, licenseKey);
+      // Store completed payment for instant checking
+      storeCompletedPayment(deviceId, licenseKey);
 
-          // Send license key to customer
-          await sendLicenseEmail(email, licenseKey, customerName);
+      // Send license key to customer
+      await sendLicenseEmail(email, licenseKey, customerName);
 
-          console.log(`✅ License ${licenseKey} generated and sent to ${email}`);
+      console.log(`✅ License ${licenseKey} generated and sent to ${email}`);
     }
 
     // Respond to Stripe
