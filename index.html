@@ -162,6 +162,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
   <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+  <script src="config.js" onerror="console.warn('⚠️ config.js not found - using default settings')"></script>
   <script>
     const qs = s => document.querySelector(s);
     const listEl = qs('#list');
@@ -275,15 +276,22 @@
         });
       }
       
-      // For demo: show instructions (replace with actual payment link)
-      alert(`🚀 Payment Integration Ready!\n\n` +
-            `Replace this alert with:\n` +
-            `window.open('https://buy.stripe.com/YOUR_LINK?client_reference_id=${deviceId}', '_blank');\n\n` +
-            `Device ID: ${deviceId}\n` +
-            `This will be used to generate your license key.`);
+      // Get Stripe configuration
+      const stripePublicKey = window.STRIPE_PUBLIC_KEY || 'pk_test_your_key_here';
+      const stripePaymentLink = window.STRIPE_PAYMENT_LINK || 'https://buy.stripe.com/YOUR_LINK';
       
-      // TODO: Replace above alert with actual payment
-      // window.open(`https://buy.stripe.com/YOUR_PAYMENT_LINK?client_reference_id=${deviceId}`, '_blank');
+      if (stripePaymentLink.includes('YOUR_LINK')) {
+        // Show setup instructions if not configured
+        alert(`🚀 Payment Integration Ready!\n\n` +
+              `To activate payments:\n` +
+              `1. Add your Stripe keys to the config\n` +
+              `2. Replace STRIPE_PAYMENT_LINK with your actual link\n\n` +
+              `Device ID: ${deviceId}\n` +
+              `This will be used to generate your license key.`);
+      } else {
+        // Open actual payment link
+        window.open(`${stripePaymentLink}?client_reference_id=${deviceId}`, '_blank');
+      }
     });
 
     function parseM3U(text){

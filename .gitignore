@@ -16,4 +16,16 @@ dist/
 # Store distribution guide (contains sensitive info)
 STORE-GUIDE.md 
 COMPETITIVE-ANALYSIS.md
-PAYMENT-INTEGRATION.md 
+PAYMENT-INTEGRATION.md
+
+# Environment variables (NEVER commit these - contain API keys)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vercel
+
+# API keys and secrets
+config.js
+secrets.json 

@@ -1,5 +1,11 @@
 // api/webhook.js - Vercel serverless function for Stripe webhooks
 import { createHash } from 'crypto';
+import Stripe from 'stripe';
+
+// Initialize Stripe with secret key from environment
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16',
+});
 
 // Simple license generation
 function generateLicenseKey(deviceId, timestamp = Date.now()) {
@@ -7,55 +13,68 @@ function generateLicenseKey(deviceId, timestamp = Date.now()) {
   return createHash('sha256').update(data).digest('hex').slice(0, 16).toUpperCase();
 }
 
-// Simple email sending (replace with your email service)
+// Simple email sending with Resend
 async function sendLicenseEmail(email, licenseKey, customerName = '') {
-  // TODO: Replace with actual email service (SendGrid, Resend, etc.)
-  console.log(`📧 License email would be sent to: ${email}`);
+  // Log for debugging
+  console.log(`📧 Sending license email to: ${email}`);
   console.log(`🔑 License Key: ${licenseKey}`);
   console.log(`👤 Customer: ${customerName}`);
   
-  // Example with Resend (uncomment when you have API key)
-  /*
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: 'Goody IPTV <noreply@goodytv.com>',
-      to: [email],
-      subject: '🎉 Your Goody IPTV Premium License',
-      html: `
-        <h1>Welcome to Goody IPTV Premium!</h1>
-        <p>Hi ${customerName || 'there'},</p>
-        <p>Thank you for purchasing Goody IPTV Premium! Your license is ready.</p>
-        <div style="background:#f8f9fa; border:2px dashed #6c757d; padding:20px; margin:20px 0; text-align:center;">
-          <h2>Your License Key</h2>
-          <code style="font-size:24px; letter-spacing:3px; color:#007bff;">${licenseKey}</code>
-        </div>
-        <h3>How to activate:</h3>
-        <ol>
-          <li>Open Goody IPTV on any device</li>
-          <li>When the trial expires, enter this license key</li>
-          <li>Enjoy 180 days of premium features!</li>
-        </ol>
-        <p><strong>Premium Features Unlocked:</strong></p>
-        <ul>
-          <li>✅ Advanced 7-day EPG</li>
-          <li>✅ Watch history & resume</li>
-          <li>✅ Multiple themes</li>
-          <li>✅ Grid/List/Compact views</li>
-          <li>✅ Multiple playlists</li>
-          <li>✅ Works on all your devices</li>
-        </ul>
-        <p>Valid until: ${new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
-        <hr>
-        <p><small>Need help? Contact support@goodytv.com</small></p>
-      `
-    })
-  });
-  */
+  // Send email with Resend if API key is configured
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+            body: JSON.stringify({
+          from: process.env.FROM_EMAIL || 'Goody IPTV <noreply@goodytv.com>',
+          to: [email],
+          subject: '🎉 Your Goody IPTV Premium License',
+          html: `
+            <h1>Welcome to Goody IPTV Premium!</h1>
+            <p>Hi ${customerName || 'there'},</p>
+            <p>Thank you for purchasing Goody IPTV Premium! Your license is ready.</p>
+            <div style="background:#f8f9fa; border:2px dashed #6c757d; padding:20px; margin:20px 0; text-align:center;">
+              <h2>Your License Key</h2>
+              <code style="font-size:24px; letter-spacing:3px; color:#007bff;">${licenseKey}</code>
+            </div>
+            <h3>How to activate:</h3>
+            <ol>
+              <li>Open Goody IPTV on any device</li>
+              <li>When the trial expires, enter this license key</li>
+              <li>Enjoy 180 days of premium features!</li>
+            </ol>
+            <p><strong>Premium Features Unlocked:</strong></p>
+            <ul>
+              <li>✅ Advanced 7-day EPG</li>
+              <li>✅ Watch history & resume</li>
+              <li>✅ Multiple themes</li>
+              <li>✅ Grid/List/Compact views</li>
+              <li>✅ Multiple playlists</li>
+              <li>✅ Works on all your devices</li>
+            </ul>
+            <p>Valid until: ${new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
+            <hr>
+            <p><small>Need help? Contact support@goodytv.com</small></p>
+          `
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Email failed: ${response.status}`);
+      }
+      
+      console.log('✅ License email sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send email:', error);
+      // Don't throw - license generation should still succeed
+    }
+  } else {
+    console.log('⚠️ No RESEND_API_KEY configured - email not sent');
+  }
 }
 
 // Store license (replace with your database)
@@ -97,15 +116,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    // For demo purposes - in production, verify Stripe signature
-    const event = req.body;
-    
-    // TODO: Add Stripe signature verification
-    /*
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    // Verify Stripe webhook signature for security
     const sig = req.headers['stripe-signature'];
-    const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    */
+    const rawBody = JSON.stringify(req.body);
+    
+    let event;
+    
+    if (process.env.STRIPE_WEBHOOK_SECRET && sig) {
+      // Production: verify webhook signature
+      try {
+        event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        console.log('✅ Webhook signature verified');
+      } catch (err) {
+        console.error('❌ Webhook signature verification failed:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    } else {
+      // Development: accept webhook without verification (NOT for production)
+      console.log('⚠️ WARNING: Webhook signature not verified (development mode)');
+      event = req.body;
+    }
 
     console.log(`📦 Webhook received:`, event.type);
 
