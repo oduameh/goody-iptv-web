@@ -61,6 +61,7 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.goody.iptv.data.Prefs
 import com.goody.iptv.data.PlaylistRepository
+import com.goody.iptv.data.PaywallManager
 import com.goody.iptv.model.Channel
 import com.goody.iptv.ui.EpgGrid
 import com.goody.iptv.ui.Programme
@@ -71,6 +72,8 @@ import kotlinx.coroutines.launch
 import com.goody.iptv.ui.PlayerControls
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,6 +101,7 @@ fun App() {
         val context = LocalContext.current
         val prefs = remember { Prefs(context) }
         val repo = remember { PlaylistRepository() }
+        val paywallManager = remember { PaywallManager(context) }
         val scope = rememberCoroutineScope()
         val snackbar = remember { SnackbarHostState() }
 
@@ -111,6 +115,13 @@ fun App() {
         var showEpg by remember { mutableStateOf(false) }
         var favoritesOnly by remember { mutableStateOf(false) }
         var sortByGroup by remember { mutableStateOf(false) }
+        
+        // Paywall state
+        var isUnlocked by remember { mutableStateOf(false) }
+        var trialStartTime by remember { mutableStateOf(0L) }
+        var showPaywall by remember { mutableStateOf(false) }
+        var unlockCode by remember { mutableStateOf("") }
+        var trialTimeLeft by remember { mutableStateOf(0L) }
 
         LaunchedEffect(Unit) {
             playlistUrl = prefs.playlistUrl.first()
@@ -125,6 +136,23 @@ fun App() {
             if (last != null) {
                 playing = channels.firstOrNull { it.url == last }
             }
+            
+            // Initialize paywall
+            paywallManager.startTrial()
+            isUnlocked = paywallManager.isUnlocked.first()
+            trialStartTime = paywallManager.trialStartTime.first()
+        }
+        
+        // Trial timer
+        LaunchedEffect(trialStartTime, isUnlocked) {
+            while (!isUnlocked && trialStartTime > 0) {
+                trialTimeLeft = paywallManager.getTrialTimeRemaining(trialStartTime)
+                if (trialTimeLeft <= 0) {
+                    showPaywall = true
+                    break
+                }
+                kotlinx.coroutines.delay(1000)
+            }
         }
 
         Scaffold(
@@ -134,6 +162,17 @@ fun App() {
                         if (!xmltvUrl.isNullOrBlank()) {
                             Text("EPG", modifier = Modifier.padding(end = 6.dp))
                             Switch(checked = showEpg, onCheckedChange = { showEpg = it })
+                        }
+                        Spacer(Modifier.weight(1f))
+                        // Trial status
+                        if (isUnlocked) {
+                            Text("✓ Unlocked", color = Color(0xFF4ADE80), modifier = Modifier.padding(end = 8.dp))
+                        } else {
+                            val minutes = (trialTimeLeft / 60000).toInt()
+                            val seconds = ((trialTimeLeft % 60000) / 1000).toInt()
+                            Text("Trial: $minutes:${seconds.toString().padStart(2, '0')}", 
+                                color = if (trialTimeLeft < 60000) Color(0xFFEF4444) else Color(0xFFA7B1C7),
+                                modifier = Modifier.padding(end = 8.dp))
                         }
                     }
                     IconButton(onClick = { TrackDialogController.open() }) { Icon(painterResource(android.R.drawable.ic_menu_sort_by_size), contentDescription = "Tracks") }
@@ -213,6 +252,46 @@ fun App() {
         }
         TrackDialogController.Render()
         PlayerControls.Render()
+        
+        // Paywall dialog
+        if (showPaywall && !isUnlocked) {
+            AlertDialog(
+                onDismissRequest = { /* Cannot dismiss */ },
+                title = { Text("🔒 Trial Expired") },
+                text = { 
+                    Column {
+                        Text("Your 10-minute trial has ended.")
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = unlockCode,
+                            onValueChange = { unlockCode = it },
+                            label = { Text("Unlock Code") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text("Contact support@goodytv.com for your unlock code", 
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFA7B1C7))
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        scope.launch {
+                            if (paywallManager.unlock(unlockCode)) {
+                                isUnlocked = true
+                                showPaywall = false
+                                snackbar.showSnackbar("Successfully unlocked!")
+                            } else {
+                                snackbar.showSnackbar("Invalid unlock code")
+                                unlockCode = ""
+                            }
+                        }
+                    }) {
+                        Text("Unlock")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -256,6 +335,13 @@ fun PlayerPane(channel: Channel?) {
     LaunchedEffect(channel) {
         player?.release()
         if (channel == null) return@LaunchedEffect
+        
+        // Check paywall before playing
+        if (!isUnlocked && trialTimeLeft <= 0) {
+            showPaywall = true
+            return@LaunchedEffect
+        }
+        
         val p = ExoPlayer.Builder(context).build()
         val item = MediaItem.Builder()
             .setUri(channel.url)
