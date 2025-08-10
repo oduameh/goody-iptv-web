@@ -1,8 +1,13 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services") apply false
-    id("com.google.firebase.crashlytics") apply false
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    kotlin("plugin.serialization") version "1.9.24"
+    // Conditional Firebase plugins
+    if (file("${rootProject.projectDir}/google-services.json").exists()) {
+        id("com.google.gms.google-services")
+        id("com.google.firebase.crashlytics")
+    }
 }
 
 android {
@@ -108,6 +113,9 @@ dependencies {
 
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Kotlinx Serialization for JSON
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // XML parsing for XMLTV (basic)
     implementation("androidx.annotation:annotation:1.8.0")
