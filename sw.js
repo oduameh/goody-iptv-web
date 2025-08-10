@@ -3,8 +3,8 @@ const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './goody-iptv-web-starter/icon-192.png',
-  './goody-iptv-web-starter/icon-512.png',
+  './icon-192.png',
+  './icon-512.png',
   'https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js'
 ];
 self.addEventListener('install', e => {
