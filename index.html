@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Goody IPTV Lite</title>
+<title>Goody IPTV</title>
 <link rel="icon" href="data:,">
 <style>
   :root { --bg:#0b0f17; --panel:#121a26; --text:#e9f0ff; --muted:#a7b1c7; --acc:#6aa7ff; }
@@ -29,6 +29,15 @@
   .btn:disabled{ opacity:.6; cursor:not-allowed; }
   .pill{ font-size:12px; padding:4px 8px; border:1px solid rgba(255,255,255,.2); border-radius:999px; color:var(--muted); }
   footer{ text-align:center; color:var(--muted); font-size:12px; padding:16px 0; }
+  
+  /* Paywall Modal */
+  .paywall-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:1000; }
+  .paywall-modal { background:var(--panel); border:2px solid var(--acc); border-radius:16px; padding:24px; max-width:400px; text-align:center; }
+  .paywall-modal h2 { color:var(--acc); margin:0 0 16px; }
+  .paywall-modal p { margin:8px 0; }
+  .unlock-input { width:100%; padding:12px; margin:16px 0; border-radius:8px; border:1px solid var(--acc); background:rgba(255,255,255,.1); color:var(--text); text-align:center; font-size:16px; }
+  .unlock-btn { background:var(--acc); color:#001029; border:none; padding:12px 24px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px; }
+  .trial-info { background:rgba(255,255,255,.05); padding:8px; border-radius:8px; margin:8px 0; font-size:12px; }
 </style>
 
 <link rel="manifest" href="manifest.json">
@@ -37,8 +46,8 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Goody IPTV Lite</h1>
-      <span class="pill">no install • test in 60s</span>
+      <h1>Goody IPTV</h1>
+      <span class="pill" id="statusPill">Trial: <span id="trialTimer">10:00</span></span>
       <div style="margin-left:auto" class="note">Use only legal streams.</div>
     </header>
 
@@ -63,7 +72,23 @@
       </section>
     </div>
 
-    <footer>Goody IPTV • single-file test app • HLS via hls.js</footer>
+    <footer>Goody IPTV • Unlock for unlimited access</footer>
+  </div>
+
+  <!-- Paywall Modal -->
+  <div id="paywallOverlay" class="paywall-overlay" style="display:none;">
+    <div class="paywall-modal">
+      <h2>🔒 Trial Expired</h2>
+      <p>Your 10-minute trial has ended.</p>
+      <p>Enter your unlock code to continue:</p>
+      <input id="unlockInput" class="unlock-input" type="text" placeholder="Enter unlock code" maxlength="16">
+      <br>
+      <button id="unlockBtn" class="unlock-btn">Unlock Full Version</button>
+      <div class="trial-info">
+        Contact support for your unlock code<br>
+        Email: support@goodytv.com
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
@@ -76,10 +101,80 @@
     const loadBtn = qs('#loadBtn');
     const urlEl = qs('#playlistUrl');
     const goLiveBtn = qs('#goLiveBtn');
+    const paywallOverlay = qs('#paywallOverlay');
+    const unlockInput = qs('#unlockInput');
+    const unlockBtn = qs('#unlockBtn');
+    const trialTimer = qs('#trialTimer');
+    const statusPill = qs('#statusPill');
 
     let CHANNELS = [];
     let CURRENT = -1;
     let hls;
+
+    // Paywall system
+    const TRIAL_DURATION = 10 * 60 * 1000; // 10 minutes
+    const UNLOCK_CODES = ['GOODY2024', 'PREMIUM123', 'UNLOCK456']; // Demo codes
+    
+    let trialStartTime = parseInt(localStorage.getItem('goodytv_trial_start') || '0');
+    let isUnlocked = localStorage.getItem('goodytv_unlocked') === 'true';
+    let trialTimeLeft = TRIAL_DURATION;
+
+    function initTrial() {
+      if (isUnlocked) {
+        statusPill.innerHTML = '<span style="color:#4ade80;">✓ Unlocked</span>';
+        return;
+      }
+      
+      if (!trialStartTime) {
+        trialStartTime = Date.now();
+        localStorage.setItem('goodytv_trial_start', trialStartTime.toString());
+      }
+      
+      updateTrialTimer();
+      setInterval(updateTrialTimer, 1000);
+    }
+
+    function updateTrialTimer() {
+      if (isUnlocked) return;
+      
+      const elapsed = Date.now() - trialStartTime;
+      trialTimeLeft = Math.max(0, TRIAL_DURATION - elapsed);
+      
+      if (trialTimeLeft <= 0) {
+        showPaywall();
+        return;
+      }
+      
+      const minutes = Math.floor(trialTimeLeft / 60000);
+      const seconds = Math.floor((trialTimeLeft % 60000) / 1000);
+      trialTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function showPaywall() {
+      paywallOverlay.style.display = 'flex';
+      if (video && !video.paused) {
+        video.pause();
+      }
+    }
+
+    function unlock() {
+      const code = unlockInput.value.trim().toUpperCase();
+      if (UNLOCK_CODES.includes(code)) {
+        localStorage.setItem('goodytv_unlocked', 'true');
+        isUnlocked = true;
+        paywallOverlay.style.display = 'none';
+        statusPill.innerHTML = '<span style="color:#4ade80;">✓ Unlocked</span>';
+        alert('Successfully unlocked! Enjoy unlimited access.');
+      } else {
+        alert('Invalid unlock code. Please contact support.');
+        unlockInput.value = '';
+      }
+    }
+
+    unlockBtn.addEventListener('click', unlock);
+    unlockInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') unlock();
+    });
 
     function parseM3U(text){
       const lines = text.split(/\r?\n/);
@@ -153,6 +248,11 @@
     }
 
     function setupPlayer(src){
+      if (!isUnlocked && trialTimeLeft <= 0) {
+        showPaywall();
+        return;
+      }
+      
       if (hls) { hls.destroy(); hls = null; }
       if (Hls.isSupported()) {
         hls = new Hls({lowLatencyMode:true, enableWorker:true, backBufferLength: 90});
@@ -189,14 +289,15 @@
     qEl.addEventListener('input', filter);
     loadBtn.addEventListener('click', loadPlaylist);
 
-    // Auto-load default Ireland playlist
+    // Initialize trial and auto-load playlist
+    initTrial();
     loadPlaylist();
   
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(()=>{});
-    });
-  }
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(()=>{});
+      });
+    }
 
 </script>
 </body>

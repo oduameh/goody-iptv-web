@@ -11,4 +11,7 @@
 # Node/web common
 node_modules/
 dist/
-.tmp/ 
+.tmp/
+
+# Store distribution guide (contains sensitive info)
+STORE-GUIDE.md 
