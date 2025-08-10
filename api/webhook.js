@@ -1,6 +1,7 @@
 // api/webhook.js - Vercel serverless function for Stripe webhooks
 import { createHash } from 'crypto';
 import Stripe from 'stripe';
+import { storeCompletedPayment } from './check-payment.js';
 
 // Initialize Stripe with secret key from environment
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -153,13 +154,16 @@ export default async function handler(req, res) {
       // Generate license key
       const licenseKey = generateLicenseKey(deviceId);
       
-      // Store license in database
-      await storeLicense(deviceId, licenseKey, email, session.id);
-      
-      // Send license key to customer
-      await sendLicenseEmail(email, licenseKey, customerName);
-      
-      console.log(`✅ License ${licenseKey} generated and sent to ${email}`);
+                // Store license in database
+          await storeLicense(deviceId, licenseKey, email, session.id);
+
+          // Store completed payment for instant checking
+          storeCompletedPayment(deviceId, licenseKey);
+
+          // Send license key to customer
+          await sendLicenseEmail(email, licenseKey, customerName);
+
+          console.log(`✅ License ${licenseKey} generated and sent to ${email}`);
     }
 
     // Respond to Stripe
