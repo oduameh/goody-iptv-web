@@ -37,6 +37,8 @@
   .paywall-modal p { margin:8px 0; }
   .unlock-input { width:100%; padding:12px; margin:16px 0; border-radius:8px; border:1px solid var(--acc); background:rgba(255,255,255,.1); color:var(--text); text-align:center; font-size:16px; }
   .unlock-btn { background:var(--acc); color:#001029; border:none; padding:12px 24px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px; }
+  .purchase-btn { background:#28a745; color:#fff; border:none; padding:12px 20px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:16px; }
+  .purchase-btn:hover { background:#218838; }
   .trial-info { background:rgba(255,255,255,.05); padding:8px; border-radius:8px; margin:8px 0; font-size:12px; }
   
   /* Premium Features */
@@ -143,7 +145,10 @@
       <p>Enter your license key to continue:</p>
       <input id="unlockInput" class="unlock-input" type="text" placeholder="Enter 16-character license key" maxlength="16">
       <br>
-      <button id="unlockBtn" class="unlock-btn">Unlock Premium</button>
+      <div style="display:flex; gap:8px; justify-content:center; margin:16px 0;">
+        <button id="unlockBtn" class="unlock-btn">Unlock Premium</button>
+        <button id="purchaseBtn" class="purchase-btn">💳 Buy License</button>
+      </div>
       <div class="trial-info">
         Get your license key:<br>
         Email: license@goodytv.com<br>
@@ -170,6 +175,7 @@
     const paywallOverlay = qs('#paywallOverlay');
     const unlockInput = qs('#unlockInput');
     const unlockBtn = qs('#unlockBtn');
+    const purchaseBtn = qs('#purchaseBtn');
     const trialTimer = qs('#trialTimer');
     const statusPill = qs('#statusPill');
 
@@ -249,6 +255,35 @@
     unlockBtn.addEventListener('click', unlock);
     unlockInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') unlock();
+    });
+    
+    // Payment integration
+    purchaseBtn.addEventListener('click', () => {
+      // Generate device ID for license binding
+      let deviceId = localStorage.getItem('goodytv_device_id');
+      if (!deviceId) {
+        deviceId = 'goody_' + Math.random().toString(36).substr(2, 12) + '_' + Date.now();
+        localStorage.setItem('goodytv_device_id', deviceId);
+      }
+      
+      // Track purchase attempt
+      if (typeof gtag !== 'undefined') {
+        gtag('event', 'purchase_initiated', {
+          value: 4.99,
+          currency: 'USD',
+          item_id: 'goody_iptv_license'
+        });
+      }
+      
+      // For demo: show instructions (replace with actual payment link)
+      alert(`🚀 Payment Integration Ready!\n\n` +
+            `Replace this alert with:\n` +
+            `window.open('https://buy.stripe.com/YOUR_LINK?client_reference_id=${deviceId}', '_blank');\n\n` +
+            `Device ID: ${deviceId}\n` +
+            `This will be used to generate your license key.`);
+      
+      // TODO: Replace above alert with actual payment
+      // window.open(`https://buy.stripe.com/YOUR_PAYMENT_LINK?client_reference_id=${deviceId}`, '_blank');
     });
 
     function parseM3U(text){

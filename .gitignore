@@ -15,4 +15,5 @@ dist/
 
 # Store distribution guide (contains sensitive info)
 STORE-GUIDE.md 
-COMPETITIVE-ANALYSIS.md 
+COMPETITIVE-ANALYSIS.md
+PAYMENT-INTEGRATION.md 

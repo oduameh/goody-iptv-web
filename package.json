@@ -1,0 +1,30 @@
+{
+  "name": "goody-iptv-web",
+  "version": "1.0.0",
+  "description": "Goody IPTV - Premium IPTV Player with Payment Integration",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python3 -m http.server 8080",
+    "build": "echo 'Static site - no build needed'",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "stripe": "^14.15.0"
+  },
+  "devDependencies": {
+    "vercel": "^32.5.6"
+  },
+  "keywords": [
+    "iptv",
+    "streaming",
+    "pwa",
+    "video",
+    "player"
+  ],
+  "author": "Goody IPTV",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oduameh/goody-iptv-web.git"
+  }
+} 

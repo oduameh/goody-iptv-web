@@ -1,7 +1,9 @@
 package com.goody.iptv
 
 import android.app.PictureInPictureParams
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -261,17 +263,71 @@ fun App() {
                 text = { 
                     Column {
                         Text("Your 10-minute trial has ended.")
+                        
+                        // Premium License Info Card
+                        Spacer(Modifier.height(16.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(
+                                    "Premium License",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "$4.99",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "Valid for 6 months (180 days)",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    "✓ Watch history ✓ Grid views ✓ Themes ✓ All devices",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        
+                        // Purchase Button
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    data = Uri.parse("https://buy.stripe.com/YOUR_PAYMENT_LINK?platform=android")
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    snackbar.showSnackbar("Visit goodytv.com to purchase")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF28A745)
+                            )
+                        ) {
+                            Text("💳 Buy License ($4.99)")
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+                        Text("Already purchased? Enter your license key:", 
+                            style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = unlockCode,
                             onValueChange = { unlockCode = it },
-                            label = { Text("Unlock Code") },
+                            label = { Text("License Key") },
+                            placeholder = { Text("16-character license") },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.height(8.dp))
-                        Text("Contact support@goodytv.com for your unlock code", 
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFA7B1C7))
                     }
                 },
                 confirmButton = {
